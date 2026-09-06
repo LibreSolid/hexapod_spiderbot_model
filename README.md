@@ -13,6 +13,7 @@
     - [Body Parts](#body-parts)
     - [Leg Parts](#leg-parts)
     - [Other Parts](#other-parts)
+  - [Simulation](#simulation)
   - [Contribution](#contribution)
   - [License](#license)
 
@@ -95,6 +96,73 @@ git clone https://github.com/robs-workbench/hexapod_spiderbot_model.git
 | Part Name | Comments | 3D Printing Instructions | Count | Photo | Link to STL |
 |-----------|----------|--------------------------|-------|-------|-------------|
 | Spiderbot stand | Consists of 2 separate pieces: a stand and a leg. This allows for airborne testing of the robot. The leg can be attached to a stable object like a tripod or weights for added stability. | Layer height: 0.3mm, Fill: 40%. For a taller stand, scale the leg in the Z direction. | 1 set (1 stand, 1 leg) | ![Spiderbot stand](media/stand.png)  | [Leg](./STL/ServoMount.stl)<br />------<br /> [Stand](./STL/ServoMount.stl) |
+
+---
+
+## Simulation
+
+`simulation/` is a [solid-node](https://pypi.org/project/solid-node/) model
+of this robot: the published STLs assembled into the machine they make,
+with the servos, bearings, battery, controller and foot switches this
+repository does not print, and a body pose that walks it.
+
+Nothing in `stl/` is edited or redesigned. The layer places what is already
+published and models only what is bought.
+
+```bash
+pip install "solid-node[viewer]"
+solid develop            # the robot in a browser, with its sliders and buttons
+solid test               # the contracts
+python -m simulation.tools.probe    # reprint the measurements
+```
+
+### What it knows
+
+An STL says what to print and nothing about where it goes, so every
+placement here was measured out of the meshes.
+`simulation/tools/probe.py` is the instrument and `docs/measurements.md`
+is what it read. Three numbers identify a joint — a servo flange's 10 mm
+hole pitch, its 48 mm pad span, and the 48.6 mm `LegRib` that spaces the
+two plates of a link — and from them the leg falls out: a 43.5 mm coxa
+with perpendicular axes, an 80 mm femur, and a tibia whose foot hangs
+184.4 mm from the knee at 75° below it.
+
+The body needed almost no measuring at all, because **the body's STL files
+are already in one shared coordinate system**: the compartment ends where
+the frame begins, the carapace begins where the frame ends, and the three
+carapace pieces overlap exactly where their tongues and grooves meet. The
+build guide exported the body assembled and never said so.
+
+### What it does
+
+The root is steered by the pose of the body, not by eighteen joint angles.
+Its frame is the **ground**: the chassis is lifted to `height` and turned
+by `roll`, `pitch` and `yaw` over six planted feet, and each leg's three
+joints are solved from where its foot has to be. `reach` sets the stance,
+`stride` and `gait_phase` walk it, and `wave` lifts a front leg.
+
+The buttons are `Stand`, `Crouch`, `Tiptoe`, `Sit`, `Wave`, `LookAround`
+and `Walk`. The tripod gait also runs off the viewer's own animation time,
+so the robot walks with nothing pressed and stands still when the stride is
+zero.
+
+### What it promises
+
+`solid test` runs the contracts, one group per capability in
+`openspec/specs/`: horn, bearing and shaft coaxial at all eighteen joints;
+the link lengths the measurements give; six stations at the frame's own
+holes; six feet on one plane; attitude that moves the body and not the
+feet; and a tripod always on the ground.
+
+The last one is the honest one. A model built by placing published STLs
+cannot promise that no two solids overlap — the repository's own exports
+interpenetrate where the electronics plate seats, and a bracket bolted flat
+to a frame has no rebate in either file. So `simulation/seats.py` names
+every pair that shares volume and by how much, and the contract is that the
+inventory is exactly right: a new overlap fails, and so does one that has
+quietly changed.
+
+The simulation is MIT, like the rest of this repository.
 
 ---
 
