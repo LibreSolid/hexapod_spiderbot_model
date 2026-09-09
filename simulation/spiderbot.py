@@ -31,7 +31,8 @@ import math
 from solid_node.math import atan2, cos, sin, sqrt
 from solid_node.mechanisms import triangle_angle
 
-from solid_node.node import AssemblyNode, SignalPort
+from solid_node.node import AssemblyNode
+from solid_node.motion.ports import SignalPort
 from solid_node.simulation import Driver, Instruction
 
 from .body import Body

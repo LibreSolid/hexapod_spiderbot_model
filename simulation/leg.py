@@ -25,7 +25,8 @@ photograph the repository publishes of the part.
 
 import math
 
-from solid_node.node import AssemblyNode, RotationalPort
+from solid_node.node import AssemblyNode
+from solid_node.motion.ports import RotationalPort
 
 from . import joint, printed, sourced
 from .params import (
