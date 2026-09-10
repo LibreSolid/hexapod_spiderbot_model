@@ -32,6 +32,7 @@ from solid_node.math import atan2, cos, sin, sqrt
 from solid_node.mechanisms import triangle_angle
 
 from solid_node.node import AssemblyNode
+from solid_node.motion.joints import Free
 from solid_node.motion.ports import SignalPort
 from solid_node.simulation import Driver, Instruction
 
@@ -73,21 +74,29 @@ class Chassis(AssemblyNode):
     """The body and its six legs: everything that moves together.
 
     Its own frame is the robot's -- x right, y forward, z up, origin at the
-    frame ring's centre on its lower face -- and the root carries it about
-    over the ground. The foot targets it solves for are worked out on the
+    frame ring's centre on its lower face -- and its own `pose` joint floats
+    it over the ground. The foot targets it solves for are worked out on the
     ground and brought into this frame, so a leg always knows where its foot
     has to be no matter how the chassis is standing.
     """
 
+    #: How the chassis stands against the ground: one floating body with
+    #: four freedoms used of six. `roll`, `pitch` and `yaw` turn it about
+    #: its own centre and `z` lifts it; `x` and `y` stay unbound, because a
+    #: robot that walks in place does not slide sideways, and an unbound
+    #: coordinate contributes no motion at all.
+    #:
+    #: The composition is the framework's: roll about x innermost, then
+    #: pitch about y, then yaw about z, then the translation. That is
+    #: exactly what `_to_chassis` inverts, and stating it as one joint is
+    #: what stops a later binding order from quietly changing it.
+    pose = Free(angle_unit='deg', length_unit='mm')
+
     body = Body()
     legs = Leg().repeat(6)
 
-    height = SignalPort(unit='mm')
     stride = SignalPort(unit='mm')
     reach = SignalPort(unit='mm')
-    roll = SignalPort(unit='deg')
-    pitch = SignalPort(unit='deg')
-    yaw = SignalPort(unit='deg')
     gait_phase = SignalPort(unit='turn')
     wave = SignalPort(unit='')
 
@@ -103,11 +112,14 @@ class Chassis(AssemblyNode):
                 list(station(x, y, heading)))
 
     def simulate(self):
+        # Eighteen joint values out of eight pose values and `$t`: no
+        # relation and no law states that, so the three joints of each leg
+        # are bound by path from the solution that produced them.
         for leg, (name, x, y, heading) in zip(self.legs, STATIONS):
             coxa, lift, knee = self._solve(name, x, y, heading)
-            leg.coxa_angle = coxa
-            leg.lift = lift
-            leg.knee = knee
+            leg.coxa.yaw = coxa
+            leg.coxa.femur.lift = lift
+            leg.coxa.femur.tibia.knee = knee
 
     # ------------------------------------------------------------ geometry
 
@@ -146,18 +158,19 @@ class Chassis(AssemblyNode):
     def _to_chassis(self, point):
         """A point on the ground, expressed in the chassis's frame.
 
-        The root lifts the chassis by `height` and turns it by roll, then
-        pitch, then yaw, so this is that composition run backwards.
+        The chassis's own `pose` joint lifts it by `pose.z` and turns it by
+        roll, then pitch, then yaw, so this is that composition run
+        backwards.
         """
-        px, py, pz = point[0], point[1], point[2] - self.height.value
+        px, py, pz = point[0], point[1], point[2] - self.pose.z.value
 
-        cy, sy = cos(-self.yaw.value), sin(-self.yaw.value)
+        cy, sy = cos(-self.pose.yaw.value), sin(-self.pose.yaw.value)
         px, py = px * cy - py * sy, px * sy + py * cy
 
-        cp, sp = cos(-self.pitch.value), sin(-self.pitch.value)
+        cp, sp = cos(-self.pose.pitch.value), sin(-self.pose.pitch.value)
         px, pz = px * cp + pz * sp, -px * sp + pz * cp
 
-        cr, sr = cos(-self.roll.value), sin(-self.roll.value)
+        cr, sr = cos(-self.pose.roll.value), sin(-self.pose.roll.value)
         py, pz = py * cr - pz * sr, py * sr + pz * cr
 
         return (px, py, pz)
@@ -263,22 +276,17 @@ class Spiderbot(AssemblyNode):
                             duration=1.5),
     }
 
-    def simulate(self):
-        # Every pose value the chassis needs, handed down.
-        self.chassis.height = self.height
-        self.chassis.reach = self.reach
-        self.chassis.stride = self.stride
-        self.chassis.roll = self.roll
-        self.chassis.pitch = self.pitch
-        self.chassis.yaw = self.yaw
-        self.chassis.gait_phase = self.gait_phase
-        self.chassis.wave = self.wave
+    # Where the chassis stands: four of its `pose` joint's six freedoms,
+    # driven directly. The framework composes them roll-pitch-yaw-lift, the
+    # order the legs are solved against, so the feet stay planted through
+    # all of it.
+    roll.drives(chassis.pose.roll)
+    pitch.drives(chassis.pose.pitch)
+    yaw.drives(chassis.pose.yaw)
+    height.drives(chassis.pose.z)
 
-        # And where it stands: turned about its own centre, then lifted off
-        # the ground. The legs are solved against exactly this composition,
-        # so the feet stay planted through all of it.
-        (self.chassis
-         .rotate(self.roll, [1, 0, 0])
-         .rotate(self.pitch, [0, 1, 0])
-         .rotate(self.yaw, [0, 0, 1])
-         .translate([0.0, 0.0, self.height]))
+    # And the four values the chassis's own solution consumes.
+    reach.drives(chassis.reach)
+    stride.drives(chassis.stride)
+    gait_phase.drives(chassis.gait_phase)
+    wave.drives(chassis.wave)

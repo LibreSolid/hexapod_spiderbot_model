@@ -3,12 +3,15 @@
 
 """A leg: coxa, femur, tibia, and the servo standing in each fork.
 
-The leg is written as three nested assemblies, one per rigid body, each with
-its origin **on the joint axis that drives it**. That is the whole trick: a
-group placed at its seat in its parent's `render()` and turned about its own
-origin in its parent's `simulate()` turns about the right line without any
-placement arithmetic, because the framework composes motion inside rest
-placement.
+The leg is written as three nested assemblies, one per rigid body, each
+carrying the `Revolute` that turns it: the coxa's `yaw`, the femur's `lift`
+and the tibia's `knee`. Each declares its axis and its anchor in its
+parent's frame, so where the line is is stated rather than arranged, and the
+framework -- not this file -- is what gets the body onto it.
+
+Each body's own origin still sits on that axis, which is why every anchor
+here is either the frame origin or the same vector the parent's `render()`
+translates by.
 
 The leg's own frame has x pointing away from the body along the station's
 heading, z up, and y to the left. At every angle of zero the coxa points
@@ -26,7 +29,7 @@ photograph the repository publishes of the part.
 import math
 
 from solid_node.node import AssemblyNode
-from solid_node.motion.ports import RotationalPort
+from solid_node.motion.joints import Revolute
 
 from . import joint, printed, sourced
 from .params import (
@@ -131,6 +134,14 @@ class Tibia(AssemblyNode):
     printed parts say.
     """
 
+    #: The knee: the tibia turns about the knee servo's shaft, which stands
+    #: `FEMUR_LENGTH` out along the femur's own x (where `Femur.render()`
+    #: places this node) and runs along the leg's y. The axis is the leg's
+    #: *negated* y because a positive knee raises the shin and a positive
+    #: turn about +y lowers it -- the sign convention, stated once here
+    #: instead of negated at every bind site.
+    knee = Revolute(axis=(0, -1, 0), at=(FEMUR_LENGTH, 0.0, 0.0), unit='deg')
+
     bracket = printed.TibiaTop()
     servo = sourced.Servo()
     adapter = printed.ServoJoint()
@@ -195,7 +206,12 @@ class Femur(AssemblyNode):
     lift joint at one end and the knee joint at the other.
     """
 
-    knee = RotationalPort(unit='deg')
+    #: The lift: the femur turns about the lift servo's shaft, which stands
+    #: `COXA_LENGTH` out and `FORK_MID` up in the coxa's frame (where
+    #: `Coxa.render()` places this node) and runs along the leg's y. The
+    #: axis is negated for the same reason the knee's is.
+    lift = Revolute(axis=(0, -1, 0),
+                    at=(COXA_LENGTH, 0.0, joint.FORK_MID), unit='deg')
 
     horn_side = printed.FemurSide2()
     bearing_side = printed.FemurSide1()
@@ -248,11 +264,6 @@ class Femur(AssemblyNode):
 
         self.tibia.translate([FEMUR_LENGTH, 0.0, 0.0])
 
-    def simulate(self):
-        # Positive knee raises the shin, and a positive turn about the
-        # leg's own y axis lowers it, so the driver enters negated.
-        self.tibia.rotate(-self.knee.value, [0, 1, 0])
-
 
 class Coxa(AssemblyNode):
     """The coxa: the yaw output, and the fork the lift servo stands in.
@@ -262,8 +273,11 @@ class Coxa(AssemblyNode):
     far ends are the fork that holds the femur's servo.
     """
 
-    lift = RotationalPort(unit='deg')
-    knee = RotationalPort(unit='deg')
+    #: The leg's yaw: the coxa turns about the yaw servo's shaft, which is
+    #: the leg frame's own z through its origin. `Leg.render()` places
+    #: nothing but the servo, so this node's placed origin is the leg
+    #: frame's origin and `at` defaults correctly.
+    yaw = Revolute(axis=(0, 0, 1), unit='deg')
 
     horn_side = printed.CoxaSide2()
     bearing_side = printed.CoxaSide1()
@@ -322,10 +336,6 @@ class Coxa(AssemblyNode):
 
         self.femur.translate([COXA_LENGTH, 0.0, joint.FORK_MID])
 
-    def simulate(self):
-        self.femur.rotate(-self.lift.value, [0, 1, 0])
-        self.femur.knee = self.knee
-
 
 class Leg(AssemblyNode):
     """One whole leg, from the station's servo out to the claw.
@@ -334,9 +344,10 @@ class Leg(AssemblyNode):
     the body's holder and does not turn with the leg; the coxa's plates and
     everything past them do.
 
-    The three angles arrive as ports, not as drivers, because the robot is
-    steered by the pose of its body: the root works out where each foot has
-    to be and what angles put it there, and feeds them in. See
+    The three angles are not drivers, because the robot is steered by the
+    pose of its body: the root works out where each foot has to be and what
+    angles put it there, and binds the three joints -- `coxa.yaw`,
+    `coxa.femur.lift` and `coxa.femur.tibia.knee` -- by path. See
     `spiderbot.py`.
     """
 
@@ -345,17 +356,8 @@ class Leg(AssemblyNode):
     #: x but the distance out to `FOOT`.
     LINKS = (COXA_LENGTH, FEMUR_LENGTH, TIBIA_REACH)
 
-    coxa_angle = RotationalPort(unit='deg')
-    lift = RotationalPort(unit='deg')
-    knee = RotationalPort(unit='deg')
-
     yaw_servo = sourced.Servo()
     coxa = Coxa()
 
     def render(self):
         self.yaw_servo.translate([0.0, 0.0, 0.0])
-
-    def simulate(self):
-        self.coxa.rotate(self.coxa_angle.value, [0, 0, 1])
-        self.coxa.lift = self.lift
-        self.coxa.knee = self.knee

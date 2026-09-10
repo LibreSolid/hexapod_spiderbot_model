@@ -419,3 +419,36 @@ the project runs meanwhile: `solid_node.motion.ports` supplies the port
 classes the two importing modules need, with no other line touched, and
 the model imports and its 34-test faceted suite passes exactly as it did
 before the motion layer moved ports out of `solid_node.node`.
+
+## Undeferred: stage B on `Free` (2026-09-10)
+
+The gap "Known gaps" 1 named is closed. solid-node main `ef379d2` carries
+**ADR-093** — the joints of one class compose in DECLARATION order, innermost
+first — and **ADR-095**, the `Free` joint: one declaration for a floating
+body, six coordinates (`roll`, `pitch`, `yaw`, `x`, `y`, `z`), composed
+`T(x,y,z) · Rz(yaw) · Ry(pitch) · Rx(roll)`. That composition is fixed by the
+framework, not by binding order, and it is exactly the chain this file's
+"What does not change" pinned by hand. ADR-095's own design record and
+fixture use this chassis as their worked example and measured the
+`_to_chassis` round trip at 1.4e-14 mm.
+
+So the chassis is stated as **one `Free`**, not the four joints this section
+asked for:
+
+    class Chassis(AssemblyNode):
+        pose = Free(angle_unit='deg', length_unit='mm')
+
+`Spiderbot.simulate()` disappears entirely rather than shrinking to four
+statements, and four of the eight relations end on `chassis.pose.roll`,
+`.pitch`, `.yaw` and `.z` instead of on a forwarding `SignalPort`, which
+takes ten ports out of the model rather than six. `pose.x` and `pose.y` stay
+unbound and contribute nothing. Every joint in "The joints to declare" is
+unchanged — same axes, same anchors, same units, no `range`.
+
+Known gap 2 (`at` restating the parent's `translate`) is unchanged and still
+costs this model two duplicated vectors. Known gap 3 is still not a gap.
+Known gap 4's risk did not materialise: the deep-path bindings moved nothing.
+
+Evidence: maximum deviation **0.000e+00** over 28 poses and 172 leaves, and
+0.0 over 504 joint-coordinate comparisons; 34/34 faceted green before and
+after, no test touched. See `tasks.md` sections 2-5.

@@ -141,6 +141,10 @@ by `roll`, `pitch` and `yaw` over six planted feet, and each leg's three
 joints are solved from where its foot has to be. `reach` sets the stance,
 `stride` and `gait_phase` walk it, and `wave` lifts a front leg.
 
+Every freedom is declared: the chassis floats on one `Free` joint whose
+roll, pitch, yaw and lift the four attitude drivers drive directly, and each
+leg's yaw, lift and knee is a `Revolute` on the body it turns.
+
 The buttons are `Stand`, `Crouch`, `Tiptoe`, `Sit`, `Wave`, `LookAround`
 and `Walk`. The tripod gait also runs off the viewer's own animation time,
 so the robot walks with nothing pressed and stands still when the stride is
