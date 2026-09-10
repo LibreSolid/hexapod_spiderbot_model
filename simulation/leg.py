@@ -5,13 +5,15 @@
 
 The leg is written as three nested assemblies, one per rigid body, each
 carrying the `Revolute` that turns it: the coxa's `yaw`, the femur's `lift`
-and the tibia's `knee`. Each declares its axis and its anchor in its
-parent's frame, so where the line is is stated rather than arranged, and the
-framework -- not this file -- is what gets the body onto it.
+and the tibia's `knee`. A joint's axis and `at` are read in its OWN body's
+rest frame (the framework's rule, not this file's), and `at` defaults to
+that body's own origin.
 
-Each body's own origin still sits on that axis, which is why every anchor
-here is either the frame origin or the same vector the parent's `render()`
-translates by.
+Every joint here turns about its own body's origin, so none states an `at`
+at all: `Femur.render()` and `Coxa.render()` place `Tibia` and `Femur`
+exactly on the axis each turns about, and `Leg.render()` places `Coxa`
+nowhere -- it stays at the leg frame's own origin, where `yaw`'s axis
+already runs.
 
 The leg's own frame has x pointing away from the body along the station's
 heading, z up, and y to the left. At every angle of zero the coxa points
@@ -134,13 +136,13 @@ class Tibia(AssemblyNode):
     printed parts say.
     """
 
-    #: The knee: the tibia turns about the knee servo's shaft, which stands
-    #: `FEMUR_LENGTH` out along the femur's own x (where `Femur.render()`
-    #: places this node) and runs along the leg's y. The axis is the leg's
-    #: *negated* y because a positive knee raises the shin and a positive
-    #: turn about +y lowers it -- the sign convention, stated once here
-    #: instead of negated at every bind site.
-    knee = Revolute(axis=(0, -1, 0), at=(FEMUR_LENGTH, 0.0, 0.0), unit='deg')
+    #: The knee: the tibia turns about the knee servo's shaft, which is the
+    #: tibia's own origin -- `Femur.render()` places this node there, at
+    #: `FEMUR_LENGTH` out along its own x -- and runs along the leg's y. The
+    #: axis is the leg's *negated* y because a positive knee raises the shin
+    #: and a positive turn about +y lowers it -- the sign convention, stated
+    #: once here instead of negated at every bind site.
+    knee = Revolute(axis=(0, -1, 0), unit='deg')
 
     bracket = printed.TibiaTop()
     servo = sourced.Servo()
@@ -206,12 +208,12 @@ class Femur(AssemblyNode):
     lift joint at one end and the knee joint at the other.
     """
 
-    #: The lift: the femur turns about the lift servo's shaft, which stands
-    #: `COXA_LENGTH` out and `FORK_MID` up in the coxa's frame (where
-    #: `Coxa.render()` places this node) and runs along the leg's y. The
-    #: axis is negated for the same reason the knee's is.
-    lift = Revolute(axis=(0, -1, 0),
-                    at=(COXA_LENGTH, 0.0, joint.FORK_MID), unit='deg')
+    #: The lift: the femur turns about the lift servo's shaft, which is the
+    #: femur's own origin -- `Coxa.render()` places this node there, at
+    #: `COXA_LENGTH` out and `FORK_MID` up in the coxa's frame -- and runs
+    #: along the leg's y. The axis is negated for the same reason the
+    #: knee's is.
+    lift = Revolute(axis=(0, -1, 0), unit='deg')
 
     horn_side = printed.FemurSide2()
     bearing_side = printed.FemurSide1()
