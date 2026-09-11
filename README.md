@@ -110,7 +110,7 @@ Nothing in `stl/` is edited or redesigned. The layer places what is already
 published and models only what is bought.
 
 ```bash
-pip install "solid-node[viewer,mechanics]>=0.7"
+pip install "solid-node[viewer]>=0.7" "solid-node-mechanics>=0.1"
 solid develop            # the robot in a browser, with its sliders and buttons
 solid test               # the contracts
 python -m simulation.tools.probe    # reprint the measurements
