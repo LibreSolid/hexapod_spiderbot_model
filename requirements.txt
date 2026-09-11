@@ -1,0 +1,3 @@
+# The leg-triangle law lives in the separate mechanics package, installed
+# through solid-node's opt-in extra.
+solid-node[mechanics]>=0.7

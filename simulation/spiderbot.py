@@ -29,7 +29,7 @@ pressed, and stands still when the stride is zero.
 import math
 
 from solid_node.math import atan2, cos, sin, sqrt
-from solid_node.mechanisms import triangle_angle
+from solid_node_mechanics import triangle_angle
 
 from solid_node.node import AssemblyNode
 from solid_node.motion.joints import Free
